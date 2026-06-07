@@ -10,18 +10,18 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-gray-800 text-center mb-2">
-          Welcome Back
+      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md max-md:p-6">
+        <h1 className="text-3xl font-bold text-gray-800 text-center mb-2 max-md:text-2xl">
+          خوش آمدید
         </h1>
         <p className="text-gray-600 text-center mb-8">
-          Sign in to your account
+          وارد حساب کاربری خود شوید
         </p>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
+              ایمیل
             </label>
             <input
               type="email"
@@ -32,7 +32,7 @@ export default function Login() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
+              رمز عبور
             </label>
             <input
               type="password"
@@ -45,17 +45,17 @@ export default function Login() {
             type="submit"
             className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition font-medium"
           >
-            Sign In
+            ورود
           </button>
         </form>
 
         <p className="text-center text-gray-600 mt-6">
-          Don't have an account?{" "}
+          حساب کاربری ندارید؟{" "}
           <a
             href="#"
             className="text-indigo-600 hover:text-indigo-700 font-medium"
           >
-            Sign up
+            ثبت‌نام
           </a>
         </p>
       </div>

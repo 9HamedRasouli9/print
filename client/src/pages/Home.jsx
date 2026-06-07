@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import AppIcon from "../components/AppIcon";
 
 export default function Home() {
   return (
@@ -6,40 +7,43 @@ export default function Home() {
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <h1 className="text-2xl font-bold text-indigo-600">Print App</h1>
+            <div className="flex items-center gap-2">
+              <AppIcon size="sm" />
+              <h1 className="text-2xl font-bold text-indigo-600">مشتری</h1>
+            </div>
             <Link
               to="/login"
               className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition font-medium"
             >
-              Login
+              ورود
             </Link>
           </div>
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 max-md:py-10">
         <div className="text-center">
-          <h2 className="text-5xl font-bold text-gray-900 mb-6">
-            Welcome to Print App
+          <h2 className="text-5xl font-bold text-gray-900 mb-6 max-md:text-3xl max-md:mb-4">
+            به مشتری خوش آمدید
           </h2>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            A simple and elegant printing solution for all your needs. Get
-            started by logging into your account.
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto max-md:text-base max-md:mb-6 max-md:px-2">
+            راه‌حلی ساده و زیبا برای تمام نیازهای چاپ شما. با ورود به حساب
+            کاربری خود شروع کنید.
           </p>
-          <div className="flex justify-center gap-4">
+          <div className="flex justify-center gap-4 max-md:flex-col max-md:px-4 max-md:gap-3">
             <Link
               to="/login"
-              className="bg-indigo-600 text-white px-8 py-3 rounded-lg hover:bg-indigo-700 transition font-medium text-lg shadow-lg hover:shadow-xl"
+              className="bg-indigo-600 text-white px-8 py-3 rounded-lg hover:bg-indigo-700 transition font-medium text-lg shadow-lg hover:shadow-xl max-md:px-6 max-md:text-base"
             >
-              Get Started
+              شروع کنید
             </Link>
-            <button className="bg-white text-indigo-600 px-8 py-3 rounded-lg hover:bg-gray-50 transition font-medium text-lg shadow-lg hover:shadow-xl border border-indigo-200">
-              Learn More
+            <button className="bg-white text-indigo-600 px-8 py-3 rounded-lg hover:bg-gray-50 transition font-medium text-lg shadow-lg hover:shadow-xl border border-indigo-200 max-md:px-6 max-md:text-base">
+              بیشتر بدانید
             </button>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 mt-16">
+        <div className="grid md:grid-cols-3 gap-8 mt-16 max-md:gap-4 max-md:mt-10">
           <div className="bg-white rounded-xl p-6 shadow-lg">
             <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4">
               <svg
@@ -57,11 +61,11 @@ export default function Home() {
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              Easy Upload
+              آپلود آسان
             </h3>
             <p className="text-gray-600">
-              Upload your documents quickly and easily with our intuitive
-              interface.
+              اسناد خود را به سرعت و به آسانی با رابط کاربری شهودی ما آپلود
+              کنید.
             </p>
           </div>
 
@@ -82,11 +86,10 @@ export default function Home() {
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              Fast Printing
+              چاپ سریع
             </h3>
             <p className="text-gray-600">
-              Get your documents printed quickly with our high-speed printing
-              service.
+              اسناد خود را با سرویس چاپ پرسرعت ما به سرعت چاپ کنید.
             </p>
           </div>
 
@@ -106,10 +109,9 @@ export default function Home() {
                 />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Secure</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">امن</h3>
             <p className="text-gray-600">
-              Your documents are safe with our secure and private printing
-              system.
+              اسناد شما با سیستم چاپ امن و خصوصی ما در امان هستند.
             </p>
           </div>
         </div>
