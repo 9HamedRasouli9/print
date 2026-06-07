@@ -8,9 +8,13 @@ import errorHandler from "./middlewares/errorHandler.js";
 
 const app = express();
 
+const allowedOrigins = (process.env.FRONTEND_API_URL || "http://localhost:5173")
+  .split(",")
+  .map((url) => url.trim());
+
 app.use(
   cors({
-    origin: [process.env.FRONTEND_API_URL || "http://localhost:5173/"],
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
@@ -19,8 +23,11 @@ app.use(express.json());
 
 app.use(cookieParser());
 
-// routes
-app.use("/api", routes);
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+// routesapp.use("/api", routes);
 
 // error handler
 app.use(errorHandler);
