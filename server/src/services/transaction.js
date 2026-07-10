@@ -7,7 +7,7 @@ const applyToBalance = (balance, amount, type) =>
 const reverseFromBalance = (balance, amount, type) =>
   type === "credit" ? balance - amount : balance + amount;
 
-export const createTransaction = async (data) => {
+export const createTransaction = async (data, userId) => {
   const { customerId, amount, type, description, date } = data;
 
   if (!customerId) throw new Error("Customer is required");
@@ -15,7 +15,7 @@ export const createTransaction = async (data) => {
   if (!type || !["credit", "debit"].includes(type))
     throw new Error("Invalid transaction type");
 
-  const customer = await Customer.findById(customerId);
+  const customer = await Customer.findOne({ _id: customerId, createdBy: userId });
   if (!customer) throw new Error("Customer not found");
 
   const transaction = await Transaction.create({
@@ -37,18 +37,19 @@ export const createTransaction = async (data) => {
   return transaction;
 };
 
-export const getAll = async (customerId) => {
-  const filter = customerId ? { customer: customerId } : {};
+export const getAll = async (customerId, userId) => {
+  const userCustomerIds = await Customer.find({ createdBy: userId }).distinct("_id");
+  const filter = { customer: { $in: userCustomerIds } };
   return Transaction.find(filter).sort({ date: -1 });
 };
 
-export const updateTransaction = async (id, data) => {
+export const updateTransaction = async (id, data, userId) => {
   if (!id) throw new Error("Id is required");
 
   const transaction = await Transaction.findById(id);
   if (!transaction) throw new Error("Transaction not found");
 
-  const customer = await Customer.findById(transaction.customer);
+  const customer = await Customer.findOne({ _id: transaction.customer, createdBy: userId });
   if (!customer) throw new Error("Customer not found");
 
   customer.accountBalance = reverseFromBalance(
@@ -80,13 +81,13 @@ export const updateTransaction = async (id, data) => {
   return transaction;
 };
 
-export const deleteTransaction = async (id) => {
+export const deleteTransaction = async (id, userId) => {
   if (!id) throw new Error("Id is required");
 
   const transaction = await Transaction.findById(id);
   if (!transaction) throw new Error("Transaction not found");
 
-  const customer = await Customer.findById(transaction.customer);
+  const customer = await Customer.findOne({ _id: transaction.customer, createdBy: userId });
   if (!customer) throw new Error("Customer not found");
 
   customer.accountBalance = reverseFromBalance(

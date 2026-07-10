@@ -1,39 +1,37 @@
 import Customer from "../models/customer.js";
 
-export const createCustomer = async (data) => {
+export const createCustomer = async (data, userId) => {
   const { fullName } = data;
-  // validation logic
 
   if (!fullName) throw new Error("Name is Required");
 
-  // create customer
-  const customer = await Customer.create(data);
+  const customer = await Customer.create({ ...data, createdBy: userId });
 
   return customer;
 };
 
-export const getAll = async () => {
-  const customers = await Customer.find();
+export const getAll = async (userId) => {
+  const customers = await Customer.find({ createdBy: userId });
   return customers;
 };
 
-export const DeleteCustomer = async (id) => {
-  // validation
+export const deleteCustomer = async (id, userId) => {
   if (!id) throw new Error("Id is Required");
 
-  const customer = await Customer.findByIdAndDelete(id);
+  const customer = await Customer.findOneAndDelete({ _id: id, createdBy: userId });
   if (!customer) throw new Error("Customer Not Found");
 
   return customer;
 };
 
-export const UpdateCustomer = async (id, data) => {
+export const updateCustomer = async (id, data, userId) => {
   if (!id) throw new Error("Id is Required");
 
-  const customer = await Customer.findByIdAndUpdate(id, data, {
-    new: true,
-    runValidators: true,
-  });
+  const customer = await Customer.findOneAndUpdate(
+    { _id: id, createdBy: userId },
+    data,
+    { new: true, runValidators: true },
+  );
   if (!customer) throw new Error("Customer Not Found");
   return customer;
 };

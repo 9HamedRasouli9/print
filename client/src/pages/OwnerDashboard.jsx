@@ -1,44 +1,103 @@
-import { useState } from "react";
-import { Users, FileText, TrendingUp, DollarSign } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Users, FileText, TrendingUp, DollarSign, ArrowDownLeft } from "lucide-react";
+import { customersApi, transactionsApi, apiRequest } from "../services/api/index";
+import { toShamsi } from "../utils/shamsiDate";
+
+const formatNumber = (num) => {
+  const n = parseFloat(String(num).replace(/,/g, "")) || 0;
+  return n.toLocaleString("fa-IR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+};
 
 export default function OwnerDashboard() {
-  const [stats] = useState({
-    totalCustomers: 156,
-    totalInvoices: 89,
-    revenue: 45678,
-    growth: 12.5
-  });
+  const [customers, setCustomers] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const [custRes, txRes] = await Promise.all([
+        apiRequest(() => customersApi.getAll()),
+        apiRequest(() => transactionsApi.getAll()),
+      ]);
+      if (custRes.success) setCustomers(custRes.data);
+      if (txRes.success) setTransactions(txRes.data);
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
+
+  const totalCustomers = customers.length;
+
+  const totalCredit = transactions
+    .filter((t) => t.type === "credit")
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+  const totalDebit = transactions
+    .filter((t) => t.type === "debit")
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+  const revenue = totalCredit - totalDebit;
+
+  const recentTransactions = transactions
+    .filter((t) => t.type === "credit")
+    .slice(0, 5);
+  const recentCustomers = [...customers]
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    .slice(0, 5);
 
   const statCards = [
     {
       title: "کل مشتریان",
-      value: stats.totalCustomers.toLocaleString("fa-IR"),
+      value: formatNumber(totalCustomers),
       icon: Users,
       color: "bg-blue-500",
-      change: "+۸ این ماه"
+      change: `${formatNumber(customers.filter(c => {
+        const created = c.createdAt ? new Date(c.createdAt) : null;
+        if (!created) return false;
+        const monthAgo = new Date();
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        return created >= monthAgo;
+      }).length)}+ این ماه`,
     },
     {
-      title: "کل فاکتورها",
-      value: stats.totalInvoices.toLocaleString("fa-IR"),
+      title: "کل تراکنش‌ها",
+      value: formatNumber(transactions.length),
       icon: FileText,
       color: "bg-green-500",
-      change: "+۱۲ این ماه"
+      change: `${formatNumber(transactions.filter(t => {
+        const d = new Date(t.date || t.createdAt || 0);
+        const monthAgo = new Date();
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        return d >= monthAgo;
+      }).length)}+ این ماه`,
     },
     {
-      title: "درآمد",
-      value: `${stats.revenue.toLocaleString("fa-IR")} افغانی`,
+      title: "درآمد خالص",
+      value: `${formatNumber(revenue)} افغانی`,
       icon: DollarSign,
       color: "bg-yellow-500",
-      change: `+${stats.growth.toLocaleString("fa-IR")}٪ این ماه`
+      change: revenue >= 0 ? "مثبت" : "منفی",
     },
     {
-      title: "نرخ رشد",
-      value: `${stats.growth.toLocaleString("fa-IR")}٪`,
+      title: "میانگین تراکنش",
+      value: `${formatNumber(transactions.length ? Math.round(revenue / transactions.length) : 0)} افغانی`,
       icon: TrendingUp,
       color: "bg-purple-500",
-      change: "+۲.۳٪ نسبت به ماه قبل"
-    }
+      change: `${formatNumber(customers.length ? Math.round(totalCredit / customers.length) : 0)} افغانی به ازای هر مشتری`,
+    },
   ];
+
+  if (loading) {
+    return (
+      <div className="p-8 max-md:p-4 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-500">در حال بارگذاری...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 max-md:p-4">
@@ -66,48 +125,57 @@ export default function OwnerDashboard() {
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">فاکتورهای اخیر</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">تراکنش‌های دریافتی اخیر</h2>
           <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((item) => (
-              <div key={item} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-blue-600" />
+            {recentTransactions.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">تراکنشی وجود ندارد</p>
+            ) : (
+              recentTransactions.map((t) => (
+                <div key={t._id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                      <ArrowDownLeft className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{t.description || "بدون توضیحات"}</p>
+                      <p className="text-sm text-gray-500">{toShamsi(t.date)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">INV-00{item}</p>
-                    <p className="text-sm text-gray-500">مشتری {item.toLocaleString("fa-IR")}</p>
+                  <div className="text-end">
+                    <p className="font-medium text-green-600">+{formatNumber(t.amount)} افغانی</p>
                   </div>
                 </div>
-                <div className="text-end">
-                  <p className="font-medium text-gray-900">{(item * 234).toLocaleString("fa-IR")} افغانی</p>
-                  <p className="text-sm text-gray-500">۲ روز پیش</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">مشتریان اخیر</h2>
           <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((item) => (
-              <div key={item} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-green-600" />
+            {recentCustomers.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">مشتری وجود ندارد</p>
+            ) : (
+              recentCustomers.map((c) => (
+                <div key={c._id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <Users className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{c.fullName}</p>
+                      <p className="text-sm text-gray-500">{c.contact || "بدون تلفن"}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">مشتری {item.toLocaleString("fa-IR")}</p>
-                    <p className="text-sm text-gray-500">customer{item}@email.com</p>
+                  <div className="text-end">
+                    <p className="text-sm font-medium text-gray-900">{formatNumber(c.accountBalance || 0)} افغانی</p>
+                    <p className="text-sm text-gray-500">
+                      {c.createdAt ? toShamsi(c.createdAt) : ""}
+                    </p>
                   </div>
                 </div>
-                <div className="text-end">
-                  <p className="text-sm font-medium text-gray-900">فعال</p>
-                  <p className="text-sm text-gray-500">{item.toLocaleString("fa-IR")} روز پیش عضو شد</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
