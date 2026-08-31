@@ -13,12 +13,44 @@
 
 @media print {
   @page {
+    size: A4 portrait;
     margin: 0;
-    size: auto;
   }
   body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    overflow: visible !important;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Hide ALL direct children of <body> except the .print-invoice-wrapper.
+     Using display:none removes hidden elements from layout entirely, so
+     the invoice content starts at the very top of the first page.
+     The invoice wrapper is portaled to document.body, so it's a direct
+     child of <body> — which makes this selector work perfectly. */
+  body > *:not(.print-invoice-wrapper) {
+    display: none !important;
+  }
+
+  .print-invoice-wrapper {
+    display: block !important;
+    position: static !important;
+  }
+
+  /* Each invoice page covers a full A4 sheet */
+  .invoice-print-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 10mm;
+    box-sizing: border-box;
+  }
+
+  .invoice-print-area table {
+    page-break-inside: avoid;
+  }
+  .invoice-print-area tr {
+    page-break-inside: avoid;
   }
 }
 

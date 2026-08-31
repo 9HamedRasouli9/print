@@ -7,11 +7,20 @@ const invoiceItemSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    quantity: {
+    count: {
       type: Number,
-      required: true,
-      min: 1,
-      default: 1,
+      default: 0,
+      min: 0,
+    },
+    kilo: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    unit: {
+      type: String,
+      default: "کیلو",
+      trim: true,
     },
     unitPrice: {
       type: Number,

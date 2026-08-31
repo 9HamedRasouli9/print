@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Search,
   Filter,
@@ -27,12 +28,14 @@ import ShamsiDatePicker from "../components/ShamsiDatePicker";
 import { customersApi, transactionsApi, invoicesApi, apiRequest } from "../services/api/index";
 import useCustomer from "../hooks/useCustomer";
 import useTransaction from "../hooks/useTransaction";
+import useInvoiceSettings from "../hooks/useInvoiceSettings";
 import {
   todayShamsi,
   toShamsi,
   shamsiToGregorian,
   shamsiToDate,
 } from "../utils/shamsiDate";
+import { Invoice } from "../components/invoice";
 
 const getInitials = (name = "") =>
   name
@@ -87,7 +90,7 @@ export default function Customers() {
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [invoiceCustomer, setInvoiceCustomer] = useState(null);
   const [invoiceData, setInvoiceData] = useState({
-    items: [{ description: "", quantity: 1, unitPrice: "" }],
+    items: [{ description: "", count: 1, kilo: "", unit: "کیلو", unitPrice: "" }],
     invoiceNumber: "",
     dueDate: "",
     paidAmount: "",
@@ -95,6 +98,7 @@ export default function Customers() {
     description: "",
   });
   const [invoiceSuccess, setInvoiceSuccess] = useState(false);
+  const { settings: invoiceSettings } = useInvoiceSettings();
 
   useEffect(() => {
     if (viewingCustomer) {
@@ -166,7 +170,7 @@ export default function Customers() {
   const handleInvoice = (customer) => {
     setInvoiceCustomer(customer);
     setInvoiceData({
-      items: [{ description: "", quantity: 1, unitPrice: "" }],
+      items: [{ description: "", count: 1, kilo: "", unit: "کیلو", unitPrice: "" }],
       invoiceNumber: "",
       dueDate: todayShamsi(),
       paidAmount: "",
@@ -181,7 +185,9 @@ export default function Customers() {
   // Compute invoice subtotal from items (before discount)
   const computeInvoiceSubtotal = (items) =>
     items.reduce((sum, item) => {
-      const qty = parseInt(item.quantity) || 0;
+      const kilo = parseFloat(String(item.kilo).replace(/,/g, "")) || 0;
+      const count = parseInt(item.count) || 0;
+      const qty = kilo > 0 ? kilo : count;
       const price = parseFloat(String(item.unitPrice).replace(/,/g, "")) || 0;
       return sum + qty * price;
     }, 0);
@@ -202,9 +208,8 @@ export default function Customers() {
   const handleAddInvoiceItem = () => {
     setInvoiceData({
       ...invoiceData,
-      items: [
-        ...invoiceData.items,
-        { description: "", quantity: 1, unitPrice: "" },
+      items: [          ...invoiceData.items,
+        { description: "", count: 1, kilo: "", unit: "کیلو", unitPrice: "" },
       ],
     });
   };
@@ -240,11 +245,20 @@ export default function Customers() {
 
     const items = invoiceData.items
       .filter((item) => item.description.trim())
-      .map((item) => ({
-        description: item.description.trim(),
-        quantity: parseInt(item.quantity) || 1,
-        unitPrice: parseFloat(String(item.unitPrice).replace(/,/g, "")) || 0,
-      }));
+      .map((item) => {
+        const kilo = parseFloat(String(item.kilo).replace(/,/g, "")) || 0;
+        const count = parseInt(item.count) || 0;
+        const unitPrice = parseFloat(String(item.unitPrice).replace(/,/g, "")) || 0;
+        return {
+          description: item.description.trim(),
+          kilo,
+          count,
+          // For server backward compatibility: effective quantity
+          quantity: kilo > 0 ? kilo : count,
+          unit: item.unit || "کیلو",
+          unitPrice,
+        };
+      });
 
     if (items.length === 0) return;
 
@@ -425,8 +439,42 @@ export default function Customers() {
 
   const totalCustomers = customersData.length;
 
+  // Derive Invoice print data from the current invoice editing state
+  const invoicePrintData = isInvoiceOpen ? {
+    headerEntries: invoiceSettings.headerEntries,
+    customer: invoiceCustomer?.fullName || "-",
+    date: invoiceData.dueDate || todayShamsi(),
+    invoiceNumber: invoiceData.invoiceNumber || "______",
+    previousDebt: parseFloat(invoiceCustomer?.accountBalance || 0),
+    paid: parseFloat(String(invoiceData.paidAmount).replace(/,/g, "")) || 0,
+    items: invoiceData.items
+      .filter((item) => item.description.trim())
+      .map((item) => {
+        const kilo = parseFloat(String(item.kilo).replace(/,/g, "")) || 0;
+        const count = parseInt(item.count) || 0;
+        const price = parseFloat(String(item.unitPrice).replace(/,/g, "")) || 0;
+        const qty = kilo > 0 ? kilo : count;
+        return {
+          description: item.description,
+          count,
+          kilo,
+          unit: item.unit || "کیلو",
+          price,
+          amount: qty * price,
+        };
+      }),
+    address: invoiceSettings.address,
+    logo: invoiceSettings.logo,
+    logoPosition: invoiceSettings.logoPosition,
+    logoAlign: invoiceSettings.logoAlign,
+    headerColor: invoiceSettings.headerColor,
+    backgroundColor: invoiceSettings.backgroundColor,
+    textColor: invoiceSettings.textColor,
+  } : null;
+
   return (
-    <div className="p-3 sm:p-4 flex flex-col gap-3 h-full min-h-0 max-md:h-auto max-md:pb-20">
+    <>
+      <div className="p-3 sm:p-4 flex flex-col gap-3 h-full min-h-0 max-md:h-auto max-md:pb-20">
       <div className="flex flex-col gap-3 shrink-0">
         <div className="flex items-center justify-between gap-3">
           <div className="bg-white rounded-xl shadow-sm p-3 sm:p-4 border border-gray-100">
@@ -1175,130 +1223,6 @@ export default function Customers() {
           }}
           zIndex={1000}
         >
-          {/* Printable Invoice Template - hidden on screen, shown when printing */}
-          <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-8 overflow-y-auto" dir="rtl">
-            <div className="max-w-3xl mx-auto">
-              {/* Header */}
-              <div className="border-b-2 border-gray-800 pb-4 mb-6">
-                <h1 className="text-2xl font-bold text-gray-900 text-center">فاکتور فروش</h1>
-                <div className="flex items-start justify-between mt-2 text-xs">
-                  <span className="text-gray-700">
-                    <span className="text-gray-500 ml-1">مشتری:</span>
-                    <span className="font-bold">{invoiceCustomer?.fullName || "-"}</span>
-                  </span>
-                  <table className="text-xs border-separate" style={{ borderSpacing: 0 }}>
-                    <tbody>
-                      {invoiceData.invoiceNumber && (
-                        <tr>
-                          <td className="text-start font-bold text-gray-700 pl-2">{invoiceData.invoiceNumber}</td>
-                          <td className="text-end text-gray-500">شماره فاکتور</td>
-                        </tr>
-                      )}
-                      <tr>
-                        <td className="text-start pl-2">{invoiceData.dueDate || todayShamsi()}</td>
-                        <td className="text-end text-gray-500">تاریخ</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              <table className="w-full mb-6 border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-gray-300">
-                    <th className="py-2 px-2 text-xs font-bold text-gray-600 text-center w-10">#</th>
-                    <th className="py-2 px-2 text-xs font-bold text-gray-600 text-start">شرح</th>
-                    <th className="py-2 px-2 text-xs font-bold text-gray-600 text-center w-20">تعداد</th>
-                    <th className="py-2 px-2 text-xs font-bold text-gray-600 text-center w-28">قیمت واحد</th>
-                    <th className="py-2 px-2 text-xs font-bold text-gray-600 text-center w-28">جمع</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoiceData.items
-                    .filter((item) => item.description.trim())
-                    .map((item, index) => {
-                      const qty = parseInt(item.quantity) || 0;
-                      const price = parseFloat(String(item.unitPrice).replace(/,/g, "")) || 0;
-                      const lineTotal = qty * price;
-                      return (
-                        <tr key={index} className="border-b border-gray-200">
-                          <td className="py-2.5 px-2 text-sm text-center text-gray-500">{index + 1}</td>
-                          <td className="py-2.5 px-2 text-sm text-gray-900">{item.description}</td>
-                          <td className="py-2.5 px-2 text-sm text-center text-gray-900">{qty.toLocaleString("fa-IR")}</td>
-                          <td className="py-2.5 px-2 text-sm text-center text-gray-900">{formatNumber(price)}</td>
-                          <td className="py-2.5 px-2 text-sm text-center font-bold text-gray-900">{formatNumber(lineTotal)}</td>
-                        </tr>
-                      );
-                    })}
-
-                </tbody>
-              </table>
-
-              {/* Summary */}
-              {(() => {
-                const subtotal = computeInvoiceSubtotal(invoiceData.items);
-                const discount = parseFloat(String(invoiceData.discount).replace(/,/g, "")) || 0;
-                const netTotal = computeInvoiceTotal(invoiceData.items, discount);
-                const paid = parseFloat(String(invoiceData.paidAmount).replace(/,/g, "")) || 0;
-                const prevBalance = parseFloat(invoiceCustomer?.accountBalance || 0);
-                const currentBalance = prevBalance - paid;
-                return (
-                  <div className="mb-6 border-t-2 border-gray-800">
-                    {/* Invoice totals */}
-                    <div className="pt-3 pb-2 border-b border-gray-200">
-                      <div className="flex items-center justify-between py-1 text-xs">
-                        <span className="text-gray-600">جمع خالص</span>
-                        <span className="text-gray-900 font-bold">{formatNumber(subtotal)}</span>
-                      </div>
-                      {discount > 0 && (
-                        <div className="flex items-center justify-between py-1 text-xs">
-                          <span className="text-gray-600">تخفیف</span>
-                          <span className="text-red-500 font-bold">-{formatNumber(discount)}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between py-1.5 text-xs font-bold">
-                        <span className="text-gray-900">قابل پرداخت</span>
-                        <span className="text-gray-900">{formatNumber(netTotal)}</span>
-                      </div>
-                    </div>
-
-                    {/* Payment & balance */}
-                    <div className="pt-2 pb-1">
-                      {paid > 0 && (
-                        <div className="flex items-center justify-between py-1 text-xs">
-                          <span className="text-gray-600">پرداخت</span>
-                          <span className="text-green-700 font-bold">{formatNumber(paid)}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between py-1 text-xs">
-                        <span className="text-gray-500">موجودی قبلی</span>
-                        <span className="text-gray-700 font-bold">{formatNumber(prevBalance)}</span>
-                      </div>
-                      <div className="flex items-center justify-between py-1 text-xs font-bold">
-                        <span className="text-gray-500">موجودی فعلی</span>
-                        <span className={currentBalance >= 0 ? "text-blue-700" : "text-red-600"}>{formatNumber(currentBalance)}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Description */}
-              {invoiceData.description && (
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">توضیحات:</p>
-                  <p className="text-sm text-gray-700">{invoiceData.description}</p>
-                </div>
-              )}
-
-              {/* Footer */}
-              <div className="border-t border-gray-300 pt-4 text-center text-xs text-gray-400">
-                <p>با تشکر از خرید شما</p>
-              </div>
-            </div>
-          </div>
-
           <div className="w-[90vw] max-w-6xl max-h-[90vh] flex flex-col print:hidden">
             {invoiceSuccess ? (
               <div className="flex flex-col items-center gap-3 py-8 animate-fadeIn">
@@ -1329,7 +1253,7 @@ export default function Customers() {
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <Hash className="w-3 h-3 text-gray-400" />
                         <code className={`text-xs font-mono font-semibold ${invoiceData.invoiceNumber ? "text-indigo-600" : "text-gray-400"}`} dir="ltr">
-                          {invoiceData.invoiceNumber || "INV-___"}
+                          {invoiceData.invoiceNumber || "______"}
                         </code>
                         <span className="text-gray-300">|</span>
                         <span className="font-medium text-gray-700">{invoiceCustomer?.fullName}</span>
@@ -1360,11 +1284,12 @@ export default function Customers() {
                     <div className="flex flex-col flex-1 min-h-0 overflow-hidden border-l border-gray-100">
                       {/* Items Table Header with Add button */}
                       <div className="shrink-0 flex items-center justify-between px-2 py-2 border-b border-gray-100">
-                        <div className="grid grid-cols-[28px_1fr_80px_110px_90px] gap-1.5 text-xs font-medium text-gray-500 flex-1">
+                        <div className="grid grid-cols-[28px_1fr_55px_55px_90px_80px] gap-1 text-xs font-medium text-gray-500 flex-1">
                           <span className="text-center">#</span>
                           <span>شرح</span>
                           <span className="text-center">تعداد</span>
-                          <span className="text-center">قیمت واحد</span>
+                          <span className="text-center">کیلو</span>
+                          <span className="text-center">قیمت</span>
                           <span className="text-center">جمع</span>
                         </div>
                         <button
@@ -1380,35 +1305,49 @@ export default function Customers() {
                       {/* Items */}
                       <div className="flex-1 min-h-0 overflow-y-auto space-y-0.5 py-1">
                         {invoiceData.items.map((item, index) => {
-                          const qty = parseInt(item.quantity) || 0;
+                          const kiloVal = parseFloat(String(item.kilo).replace(/,/g, "")) || 0;
+                          const countVal = parseInt(item.count) || 0;
                           const price = parseFloat(String(item.unitPrice).replace(/,/g, "")) || 0;
+                          const qty = kiloVal > 0 ? kiloVal : countVal;
                           const lineTotal = qty * price;
 
                           return (
                             <div
                               key={index}
-                              className="grid grid-cols-[28px_1fr_80px_110px_90px_32px] gap-1.5 items-center px-2 py-1.5 rounded-lg hover:bg-gray-50 transition"
+                              className="grid grid-cols-[28px_1fr_55px_55px_90px_80px_32px] gap-1 items-center px-2 py-1.5 rounded-lg hover:bg-gray-50 transition"
                             >
                               <span className="text-xs text-gray-400 text-center font-mono">{index + 1}</span>
                               <input
                                 type="text"
-                                className="w-full px-2.5 py-1.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                className="w-full px-2 py-1.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
                                 placeholder="شرح قلم..."
                                 value={item.description}
                                 onChange={(e) => handleInvoiceItemChange(index, "description", e.target.value)}
                               />
                               <input
                                 type="number"
-                                min="1"
-                                className="w-full px-1.5 py-1.5 text-sm text-center bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                                value={item.quantity}
-                                onChange={(e) => handleInvoiceItemChange(index, "quantity", e.target.value)}
+                                min="0"
+                                className="w-full px-1 py-1.5 text-sm text-center bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                placeholder="تعداد"
+                                value={item.count}
+                                onChange={(e) => handleInvoiceItemChange(index, "count", e.target.value)}
                               />
                               <input
                                 type="text"
                                 inputMode="decimal"
-                                className="w-full px-1.5 py-1.5 text-sm text-center bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                                placeholder="0.00"
+                                className="w-full px-1 py-1.5 text-sm text-center bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                placeholder="کیلو"
+                                value={item.kilo}
+                                onChange={(e) => {
+                                  const rawValue = e.target.value.replace(/[^0-9.]/g, "");
+                                  handleInvoiceItemChange(index, "kilo", rawValue);
+                                }}
+                              />
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                className="w-full px-1 py-1.5 text-sm text-center bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                placeholder="قیمت"
                                 value={item.unitPrice}
                                 onChange={(e) => {
                                   const rawValue = e.target.value.replace(/[^0-9.]/g, "");
@@ -1600,5 +1539,16 @@ export default function Customers() {
         </PopupScreen>
       )}
     </div>
+
+      {/* Invoice print template — rendered at document.body via portal
+          so it's a direct child of <body> and can flow naturally for
+          multi-page printing without interference from popup positioning. */}
+      {isInvoiceOpen && invoicePrintData && createPortal(
+        <div className="print-invoice-wrapper" style={{ display: 'none' }}>
+          <Invoice data={invoicePrintData} />
+        </div>,
+        document.body
+      )}
+    </>
   );
 }

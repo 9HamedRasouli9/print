@@ -9,7 +9,12 @@ export const createInvoice = async (data) => {
 
   // Calculate total from items
   const subtotal = (items || []).reduce(
-    (sum, item) => sum + (item.quantity || 1) * (item.unitPrice || 0),
+    (sum, item) => {
+      const kilo = item.kilo || 0;
+      const count = item.count || 0;
+      const qty = kilo > 0 ? kilo : (count || 1);
+      return sum + qty * (item.unitPrice || 0);
+    },
     0,
   );
 
